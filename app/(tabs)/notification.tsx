@@ -1,6 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView } from 'react-native';
+import { useState, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView ,Button, Platform  } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Device from "expo-device";
+import * as Notifications from "expo-notifications";
+import Constants from 'expo-constants';
+
+
 
 const COLORS = {
   primary: '#2563EB',
@@ -15,7 +20,139 @@ const COLORS = {
   gray900: '#0F172A',
 };
 
+
+
+
+
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
+
+// async function sendPushNotification(expoPushToken: string) {
+//   const message = {
+//     to: expoPushToken,
+//     sound: 'default',
+//     title: 'Original Title',
+//     body: 'And here is the body!',
+//     data: { someData: 'goes here' },
+//   };
+
+//   await fetch('https://exp.host/--/api/v2/push/send', {
+//     method: 'POST',
+//     headers: {
+//       Accept: 'application/json',
+//       'Accept-encoding': 'gzip, deflate',
+//       'Content-Type': 'application/json',
+//     },
+//     body: JSON.stringify(message),
+//   });
+// }
+
+function handleRegistrationError(errorMessage: string) {
+  alert(errorMessage);
+  throw new Error(errorMessage);
+}
+
+export const registerForPushNotifications = async () => {
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
+
+  if (!Device.isDevice) {
+    return handleRegistrationError('Must use physical device for push notifications');
+  }
+
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+  if (existingStatus !== 'granted') {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  
+  if (finalStatus !== 'granted') {
+    return handleRegistrationError('Permission not granted for push notifications');
+  }
+
+  try {
+    const projectId = "2264f7da-997d-45c0-924d-a3f1c5d57eba";
+    if (!projectId) {
+      return handleRegistrationError('Project ID not found');
+    }
+
+    const expoPushToken = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+   console.log(expoPushToken)
+    const userId = "1"
+
+    if (!userId || !expoPushToken) {
+      return handleRegistrationError('Failed to get required registration data');
+    }
+
+    const response = await fetch('http://localhost:3000/register-push-token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId,
+        expoPushToken,
+      }),
+    });
+
+    const result = await response.json();
+    if (!result.success) {
+      return handleRegistrationError('Failed to register with server');
+    }
+
+    return { userId, expoPushToken };
+  } catch (error) {
+    return handleRegistrationError(`Registration failed: ${error}`);
+  }
+};
+
+
+
+
+
 const NotificationScreen = () => {
+  const [expoPushToken, setExpoPushToken] = useState('');
+  const [notification, setNotification] = useState<Notifications.Notification | undefined>(
+    undefined
+  );
+  const notificationListener = useRef<Notifications.Subscription>();
+  const responseListener = useRef<Notifications.Subscription>();
+
+  useEffect(() => {
+    // registerForPushNotifications()
+    //   .then(token => setExpoPushToken(token?.expoPushToken ?? ''))
+    //   .catch((error: any) => setExpoPushToken(`${error}`));
+
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      setNotification(notification);
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log(response);
+    });
+
+    return () => {
+      notificationListener.current &&
+        Notifications.removeNotificationSubscription(notificationListener.current);
+      responseListener.current &&
+        Notifications.removeNotificationSubscription(responseListener.current);
+    };
+  }, []);
+ 
+
   const [activeTab, setActiveTab] = useState('all');
   
   const notifications = [
@@ -55,6 +192,7 @@ const NotificationScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+     
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Text style={styles.headerTitle}>Security Alerts</Text>

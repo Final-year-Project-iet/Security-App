@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Security-App",
-    "slug": "Security-App",
+    "slug": "security-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -31,6 +31,12 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2264f7da-997d-45c0-924d-a3f1c5d57eba"
+      }
+    },
+    "owner": "anish231000"
   }
 }
